@@ -14,14 +14,31 @@
         android:id="@+id/button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Sending"
+        android:text="Start Sending (click only ONCE)"
         />
-
+    //-----------------------------------------------
     <TextView
-        android:id="@+id/cInfo"
+        android:id="@+id/cliInfo"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="" />
+
+
+    <TextView
+        android:id="@+id/senInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="" />
+
+
+    <TextView
+        android:id="@+id/recInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="" />
+
+
+    //-----------------------------------------------
 
 
 </LinearLayout>
