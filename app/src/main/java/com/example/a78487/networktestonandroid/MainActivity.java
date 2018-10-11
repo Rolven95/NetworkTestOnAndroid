@@ -23,9 +23,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private Context context;
     //---------------------------------------
-    public static String serverIP = "192.168.1.105"; //"13.233.125.32";
+    public static String serverIP = "13.115.245.244"; //"13.233.125.32";
+    //public static String serverIP = "192.168.1.105"; //"13.233.125.32";
     public static int serverPort = 9001;
-    public static int packetLength = 512;
+    public static int packetLength = 1024;
     public static DatagramSocket clientSocket ;
     public static int localPort ;
     public static String localIP ;
@@ -67,24 +68,21 @@ public class MainActivity extends AppCompatActivity {
 
         //button.setText();
 
-
-
-
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick (View v) {
                 Log.i(TAG, "Client Started");
                 cliInfo = (TextView)findViewById(R.id.textview);
-                cliInfo.setText("System Info: Button clicked, trying to connect to server");
-                try {
-                    clientSocket = new DatagramSocket(); //TODO 避免重复打开同一端口
-                    ExecutorService exec = Executors.newCachedThreadPool();
-                    Thread thread1=new Thread(new ClientReciever());
-                    Thread thread2=new Thread(new ClientSender());
-                    exec.execute(thread1);
-                    exec.execute(thread2);
-                    exec.shutdown();
-                    Daemon daemon=new Daemon();
+                    cliInfo.setText("System Info: Button clicked, trying to connect to server");
+                    try {
+                        clientSocket = new DatagramSocket(); //TODO 避免重复打开同一端口
+                        ExecutorService exec = Executors.newCachedThreadPool();
+                        Thread thread1=new Thread(new ClientReciever());
+                        Thread thread2=new Thread(new ClientSender());
+                        exec.execute(thread1);
+                        exec.execute(thread2);
+                        exec.shutdown();
+                        Daemon daemon=new Daemon();
                     Thread daemoThread=new Thread(daemon);
                     daemoThread.setDaemon(true);
                     daemoThread.start();
@@ -139,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
                         clientSocket.send(tosent);
                         System.out.println(arrival.getSeq() + " ACK sent back");
                 } else {
-                    System.out.println("recieved a shit");
+                    System.out.println("received a shit");
                 }
                 }
             }catch (IOException e) {
@@ -159,7 +157,7 @@ public class MainActivity extends AppCompatActivity {
                     if (!reqSentFlag && onProgress) {//如果目前没有在进行任何活动 自动进入
                       System.out.println("New progress started and request is sending (20 times)");
                       Log.i(TAG, "New progress started and request is sending (20 times)");
-                      for(int i = 0 ;i < 20 ; i++){
+                      for(int i = 0 ;i < 10 ; i++){
                         byte[] buf = new byte[packetLength];
                         unicast_packet to_sent = new unicast_packet(-1, -1);
                         //System.out.println("clent type = " + to_sent.getType());
@@ -168,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
                         DatagramPacket tosent = new DatagramPacket(buf, buf.length,
                                 InetAddress.getByName(serverIP), serverPort); //192.168.202.191  192.168.109.1
                         clientSocket.send(tosent);
-                        Thread.sleep(3);
+                        Thread.sleep(5);
                       }
                       reqSentFlag = true;
                     }                               //请求发送完毕 开始等待服务器回应 若无回应则进入单向模式
@@ -181,8 +179,8 @@ public class MainActivity extends AppCompatActivity {
                         System.out.println("Client sender on one way mode, start send shit to server");
                         //cInfo.setText("Server lost, entering one-way mode, do not close this app.");
                         int i , interval;
-                        for (interval = 0 ; interval <21 ; interval++){
-                            for(i = 0 ;i<1000 ; i++) {
+                        for (interval = 0 ; interval <9 ; interval++){
+                            for(i = 0 ;i<10000 ; i++) {
                                 byte[] buf = new byte[packetLength];
                                 unicast_packet to_sent = new unicast_packet(i, 0);
                                 to_sent.setDeparture(System.currentTimeMillis());

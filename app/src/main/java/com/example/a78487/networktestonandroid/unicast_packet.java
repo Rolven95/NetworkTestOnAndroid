@@ -13,6 +13,7 @@ import java.nio.ByteOrder;
 
 //import java.lang;
 public class unicast_packet {
+    public static final int  packetLength = 1024;
 
     private int seq = 0; //  if seq == -1, this is connection building packet
 
@@ -22,7 +23,10 @@ public class unicast_packet {
     private String from = "";
     private int type = 0;
 
+
     public unicast_packet() {
+
+
 
     }
     public unicast_packet(int t) {
@@ -81,7 +85,7 @@ public class unicast_packet {
         this.type = p;
     }
     public byte[] toByteArray() throws UnknownHostException {
-        ByteBuffer buffer = ByteBuffer.allocate(36);
+        ByteBuffer buffer = ByteBuffer.allocate(packetLength);
         buffer.order(ByteOrder.BIG_ENDIAN);
 
         buffer.putInt(this.seq);	    	  // 4bytes 0-3
@@ -96,10 +100,19 @@ public class unicast_packet {
         buffer.put(ip_in_bytes[2]);
         buffer.put(ip_in_bytes[3]);
 
+
         //System.out.println("");
         byte[] bytes = buffer.array();
+
+        //for(int i = 0; i<36 ; i++) {
+        //	System.out.println("all["+ i +"] =  "+ bytes[i]);
+        //}
+
+        //System.out.println("dep decoded is : " + longFrom8Bytes(bytes, 4, false));
+
         return bytes;
     }
+
     public static long longFrom8Bytes(byte[] input, int offset, boolean littleEndian){
         long value=0;
         // 循环读取每个字节通过移位运算完成long的8个字节拼装
