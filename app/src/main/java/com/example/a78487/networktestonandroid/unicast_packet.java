@@ -84,8 +84,16 @@ public class unicast_packet {
     public void seType(int p) {
         this.type = p;
     }
-    public byte[] toByteArray() throws UnknownHostException {
-        ByteBuffer buffer = ByteBuffer.allocate(packetLength);
+
+
+    public byte[] toByteArray(int type) throws UnknownHostException {
+        ByteBuffer buffer;
+        if(type != 1 ) { // non-ack
+            buffer = ByteBuffer.allocate(packetLength);
+
+        }else{
+            buffer = ByteBuffer.allocate(50);
+        }
         buffer.order(ByteOrder.BIG_ENDIAN);
 
         buffer.putInt(this.seq);	    	  // 4bytes 0-3
@@ -156,7 +164,7 @@ public class unicast_packet {
 
     public void sendThisPacket(unicast_packet to_sent, DatagramSocket socket, String targetIP, int port){
         try {
-            byte[] buf = to_sent.toByteArray();
+            byte[] buf = to_sent.toByteArray(to_sent.getType());
             DatagramPacket packet = new DatagramPacket(buf, buf.length,
                     InetAddress.getByName(targetIP), port);
             socket.send(packet);

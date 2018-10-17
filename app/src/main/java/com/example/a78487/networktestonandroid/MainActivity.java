@@ -1,6 +1,13 @@
 package com.example.a78487.networktestonandroid;
 
+import android.annotation.SuppressLint;
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -23,14 +30,17 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private Context context;
     //---------------------------------------
-    public static String serverIP = "13.115.245.244"; //"13.233.125.32";
-    //public static String serverIP = "192.168.1.105"; //"13.233.125.32";
+    //public static String serverIP = "13.115.245.244"; //"13.233.125.32";
+    public static String serverIP = "35.154.250.202"; //"13.233.125.32";35.154.250.202
+    public static String displayMessage = "";
     public static int serverPort = 9001;
-    public static int packetLength = 1024;
+    public static int packetLength = 1408;
+    public static int latestSeq = 0;
     public static DatagramSocket clientSocket ;
     public static int localPort ;
     public static String localIP ;
-    public static boolean onProgress = false;
+    public static boolean connectionFlag = false; // 判断连接是否还在
+    public static boolean onProgress = false; //进程开关
     public static boolean dupTimeout = true; //默认超时
     public static boolean reqSentFlag = false;
     public static boolean oneWayMode = true;
@@ -39,6 +49,21 @@ public class MainActivity extends AppCompatActivity {
     public static TextView recInfo;
 
     //---------------------------------------
+    private static ProgressDialog progressDialog;
+    private static AlertDialog dialog;
+    //private AlertDialog dialog;
+
+    @SuppressLint("HandlerLeak")
+    private  Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if (progressDialog != null) {
+                progressDialog.setIndeterminate(false);
+                    progressDialog.setProgress(msg.what);
+            }
+        }
+    };
     public String getIP(){
         try {
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
@@ -58,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return null;
     }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,38 +91,52 @@ public class MainActivity extends AppCompatActivity {
         Button button = (Button)findViewById(R.id.button);
         TextView ipAddr = (TextView)findViewById(R.id.textview);
         ipAddr.setText("Local IP: "+ this.getIP());
+        //dialog = new AlertDialog.Builder(MainActivity.this);
 
-        //button.setText();
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick (View v) {
                 Log.i(TAG, "Client Started");
                 cliInfo = (TextView)findViewById(R.id.textview);
-                    cliInfo.setText("System Info: Button clicked, trying to connect to server");
-                    try {
-                        clientSocket = new DatagramSocket(); //TODO 避免重复打开同一端口
-                        ExecutorService exec = Executors.newCachedThreadPool();
-                        Thread thread1=new Thread(new ClientReciever());
-                        Thread thread2=new Thread(new ClientSender());
-                        exec.execute(thread1);
-                        exec.execute(thread2);
-                        exec.shutdown();
-                        Daemon daemon=new Daemon();
-                    Thread daemoThread=new Thread(daemon);
+                        cliInfo.setText("System Info: Button clicked, trying to connect to server");
+                        try {
+                            clientSocket = new DatagramSocket(); //
+                            ExecutorService exec = Executors.newCachedThreadPool();
+                            Thread thread1=new Thread(ClientReciever);
+                            Thread thread2=new Thread(ClientSender);
+                            Thread thread3=new Thread(AlertManager);
+                            exec.execute(thread1);
+                            exec.execute(thread2);
+                            exec.execute(thread3);
+                            exec.shutdown();
+                        //Daemon daemon=new Daemon();
+                    Thread daemoThread=new Thread(Daemon);
                     daemoThread.setDaemon(true);
                     daemoThread.start();
                     onProgress = true;
+                    progressDialog = new ProgressDialog(MainActivity.this);
+                            dialog = new AlertDialog.Builder(MainActivity.this).create();
+                    progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                    progressDialog.setCancelable(false); // 能够返回
+                    progressDialog.setTitle("Test is on progress"); // 不设置标题的话图标不会显示
+                    progressDialog.setMessage("Please keep this APP on.");
+                    progressDialog.setMax(50000*12);
+                    //progressDialog.setCanceledOnTouchOutside(true); // 点击外部返回
+                    progressDialog.setIndeterminate(true);//设置为不明确,则会再最大最小值之间滚动
+                    progressDialog.show();
                 } catch (SocketException e) {
                     e.printStackTrace();
                 }
+                    displayMessage = "Loading, please wait for 7s";
+
             }
         });
     }
     ///----------------------------------------------------------------------
-    static class ClientReciever implements Runnable{
+    private Runnable ClientReciever = new Runnable(){
         @Override
-        public void run() {
+        public void run(){
             try {
                 System.out.println("Client listener Online");
                 //System.out.println("Client listening at: "+ localIP
@@ -111,12 +151,11 @@ public class MainActivity extends AppCompatActivity {
                     if(arrival.getType() == -2) {//服务端收到req 返回打洞尝试
                         oneWayMode = false;
                         System.out.println("client in duplex mode");
-
                         for(int i = 0 ;i < 5 ; i++){
                             //byte[] buf = new byte[packetLength];
                             unicast_packet to_sent = new unicast_packet(-2);
                             //System.out.println("clent type = " + to_sent.getType());
-                            buf = to_sent.toByteArray();
+                            buf = to_sent.toByteArray(to_sent.getType());
                             System.out.println("dup notif sent to  " + serverIP +":" + serverPort);
                             DatagramPacket tosent = new DatagramPacket(buf, buf.length,
                                     InetAddress.getByName(serverIP), serverPort); //192.168.202.191  192.168.109.1
@@ -125,17 +164,22 @@ public class MainActivity extends AppCompatActivity {
                     }else if(arrival.getType() == 0) {//收到Data 自动进入dup模式 返回ACK
                         dupTimeout = false; //取消 超时 flag
                         oneWayMode = false;
+                        connectionFlag = true;
 
                         //System.out.println("client enter duplex mode");
                         unicast_packet to_sent = arrival;
-                        arrival.seType(1);
-                        arrival.setArrival(System.currentTimeMillis());
-                        buf = to_sent.toByteArray();
+                        to_sent.seType(1);
+                        to_sent.setArrival(System.currentTimeMillis());
+                        buf = to_sent.toByteArray(to_sent.getType());
                         DatagramPacket tosent = new DatagramPacket(buf, buf.length,
                                 InetAddress.getByName(serverIP), serverPort);
                         //Thread.sleep(2000);
                         clientSocket.send(tosent);
-                        System.out.println(arrival.getSeq() + " ACK sent back");
+                        latestSeq = arrival.getSeq();
+                        //handler.sendEmptyMessage(latestSeq*100/50000/9);
+                        handler.sendEmptyMessage(latestSeq);
+                        //System.out.println(arrival.getSeq() + " ACK sent back" + " size of: "+ buf.length);
+
                 } else {
                     System.out.println("received a shit");
                 }
@@ -145,9 +189,9 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
-    }
+    };
 
-    static class ClientSender implements Runnable{
+    private Runnable ClientSender = new Runnable(){
         @Override
         public void run() {
             try {
@@ -158,10 +202,10 @@ public class MainActivity extends AppCompatActivity {
                       System.out.println("New progress started and request is sending (20 times)");
                       Log.i(TAG, "New progress started and request is sending (20 times)");
                       for(int i = 0 ;i < 10 ; i++){
-                        byte[] buf = new byte[packetLength];
+                        // buf = new byte[packetLength];
                         unicast_packet to_sent = new unicast_packet(-1, -1);
                         //System.out.println("clent type = " + to_sent.getType());
-                        buf = to_sent.toByteArray();
+                        byte[] buf = to_sent.toByteArray(to_sent.getType());
                         System.out.println("req sent to " + serverIP +" at " + serverPort);
                         DatagramPacket tosent = new DatagramPacket(buf, buf.length,
                                 InetAddress.getByName(serverIP), serverPort); //192.168.202.191  192.168.109.1
@@ -171,33 +215,39 @@ public class MainActivity extends AppCompatActivity {
                       reqSentFlag = true;
                     }                               //请求发送完毕 开始等待服务器回应 若无回应则进入单向模式
                     Log.i(TAG, "Sender: Connection request sent, waiting for response (6s)");
-
                     Thread.sleep(6000);
-
                     if(oneWayMode && onProgress && reqSentFlag){//若没有检测到服务器回应，进入单向模式
                         Log.i(TAG, "Sender: Entered One-way mode");
                         System.out.println("Client sender on one way mode, start send shit to server");
                         //cInfo.setText("Server lost, entering one-way mode, do not close this app.");
-                        int i , interval;
-                        for (interval = 0 ; interval <9 ; interval++){
-                            for(i = 0 ;i<10000 ; i++) {
+                        int i, interval,gapCounter,seq = 0;
+                        for (interval = 0 ; interval < 12 ; interval++){
+                            gapCounter = 0;
+                            for(i = 0 ;i < 500000 ; i++) {
                                 byte[] buf = new byte[packetLength];
-                                unicast_packet to_sent = new unicast_packet(i, 0);
+                                unicast_packet to_sent = new unicast_packet(seq, 0);
                                 to_sent.setDeparture(System.currentTimeMillis());
-                                buf = to_sent.toByteArray();
-                                Log.i(TAG, i + " sent to " + serverIP + " at " + serverPort);
-                                System.out.println(i + " sent to " + serverIP + " at " + serverPort);
+                                buf = to_sent.toByteArray(to_sent.getType());
+                                //Log.i(TAG, i + " sent to " + serverIP + " at " + serverPort);
+                                //System.out.println(i + " sent to " + serverIP + " at " + serverPort);
                                 DatagramPacket tosent = new DatagramPacket(buf, buf.length,
                                         InetAddress.getByName(serverIP), serverPort);
                                 clientSocket.send(tosent);
-                                Thread.sleep(interval);
+                                Thread.sleep((int)Math.floor(interval/3));
+                                if (gapCounter >= (i+1)*100) { //实际上为cwdn
+                                    Thread.sleep(5);
+                                    gapCounter=0;
+                                }
+                                gapCounter++;
+                                seq++;
+                                latestSeq = seq;
+                                //handler.sendEmptyMessage(seq*100/50000/9);
+                                handler.sendEmptyMessage(seq);
                             }
                             Thread.sleep(1000);
                         }
-
                         Log.i(TAG, "Sender: one-way mode done, onProgress off");
                         System.out.println("Sender: one-way mode , onProgress off");
-                        //cInfo.setText("Test Done, please kill this app.");
                         onProgress = false;
                     }
                 }
@@ -206,9 +256,36 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
-    }
+    };
 
-    static class Daemon implements Runnable {
+    private Runnable AlertManager = new Runnable(){
+        @Override
+        public void run () {
+            //dialog = new AlertDialog.Builder(MainActivity.this);
+            while(true){ //Message uploader
+                try{
+                Thread.sleep(1000);
+
+                if (onProgress && oneWayMode ){ //
+
+                }else if (onProgress && !oneWayMode){
+                    if (connectionFlag){
+                        handler.sendEmptyMessage(-1);
+                    }else{
+
+                    }
+                } else if (!onProgress) {
+
+                }
+                }catch (InterruptedException e) {
+                    System.out.println("Alert Manager is dead");
+                }
+            }
+        }
+    };
+
+
+    private Runnable Daemon = new Runnable(){
         @Override
         public void run () {
             while (true) {
@@ -219,16 +296,17 @@ public class MainActivity extends AppCompatActivity {
                         System.out.println("Deamon find dup-way mode is on");
                         Thread.sleep(10000); // 从任务开始至首次检测超时的时间
                         while (!dupTimeout) { // check one way mode flag
-                            System.out.println("Deamon: one-way still running");
+                            System.out.println("Deamon: Dup-way still running");
                             dupTimeout = true; // 1/0逻辑与服务端相反
                             Thread.sleep(5000); //最大收包间隔，若五秒内没有再收到则超时
                         }
-                        System.out.println("Deamon Client one-way timeout!!");
-                        onProgress = false;
+                        System.out.println("Deamon Client Dup-way timeout!!");
+                        onProgress = true;
+                        connectionFlag = false;
                         System.out.println("Server: Oneway mode ended, One way timeout, connection break");
+
                         //cInfo.setText("Test Done, please kill this app.");
                     }
-
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                     System.out.println("Deamon is dead");
@@ -236,7 +314,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-    }
+    };
 
     //-----------------------------------------------------------------------
 }
