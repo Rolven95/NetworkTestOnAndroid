@@ -14,6 +14,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
@@ -32,7 +33,8 @@ public class MainActivity extends AppCompatActivity {
     //---------------------------------------
     //public static String serverIP = "13.115.245.244"; //"13.233.125.32";
     public static String serverIP = "35.154.250.202"; //"13.233.125.32";35.154.250.202
-    public static String displayMessage = "";
+    //public static String serverIP = "192.168.202.20";
+    public static String displayMessage = "WIFI";
     public static int serverPort = 9001;
     public static int packetLength = 1408;
     public static int latestSeq = 0;
@@ -44,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     public static boolean dupTimeout = true; //默认超时
     public static boolean reqSentFlag = false;
     public static boolean oneWayMode = true;
+    public static String environment;
     public static TextView cliInfo;
     public static TextView senInfo;
     public static TextView recInfo;
@@ -60,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
             super.handleMessage(msg);
             if (progressDialog != null) {
                 progressDialog.setIndeterminate(false);
-                    progressDialog.setProgress(msg.what);
+                progressDialog.setProgress(msg.what);
             }
         }
     };
@@ -90,13 +93,47 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.new_activity_main);
         Button button = (Button)findViewById(R.id.button);
         TextView ipAddr = (TextView)findViewById(R.id.textview);
-        ipAddr.setText("Local IP: "+ this.getIP());
+        ipAddr.setText("Local IP: "+ this.getIP() + "(If showing 'null', re-check your network");
         //dialog = new AlertDialog.Builder(MainActivity.this);
 
+                            // 创建数据
+        final String[] items = new String[] { "WIFI", "Airtel 4G", "Jio 4G", "Other 4G","3G", "2G" };
+                            // 创建对话框构建器
+        final AlertDialog.Builder[] listBuilder = {new AlertDialog.Builder(this)};
+                            // 设置参数
+        listBuilder[0].setTitle("Choose a Environment, click out, and click on the sending button")
+                .setSingleChoiceItems(items, 0, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                            // TODO Auto-generated method stub
+                            Toast.makeText(MainActivity.this, items[which],
+                                    Toast.LENGTH_SHORT).show();
+                            Log.i(TAG, "which = " + which);
+                            switch (which)
+                        {
+                            case 0:{
+                                environment = "WIFI";
+                                listBuilder[0].create().dismiss();
+                                //listBuilder[0] = null;
+                            }break;
+                            case 1:environment = "A4Gx";listBuilder[0].create().dismiss();break;
+                            case 2:environment = "J4Gx";listBuilder[0].create().dismiss();break;
+                            case 3:environment = "O4Gx";listBuilder[0].create().dismiss();break;
+                            case 4:environment = "3Gxx";listBuilder[0].create().dismiss();break;
+                            case 5:environment = "2Gxx";listBuilder[0].create().dismiss();break;
+
+                        }
+                        Log.i(TAG, "choose result:" + environment);
+                        Log.i(TAG, "byte length:"+ environment.getBytes().length);
+                    }
+                });
+        listBuilder[0].create().show();
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick (View v) {
+                listBuilder[0].create().dismiss();
+                listBuilder[0] = null;
                 Log.i(TAG, "Client Started");
                 cliInfo = (TextView)findViewById(R.id.textview);
                         cliInfo.setText("System Info: Button clicked, trying to connect to server");
@@ -129,7 +166,6 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
                     displayMessage = "Loading, please wait for 7s";
-
             }
         });
     }
@@ -170,6 +206,7 @@ public class MainActivity extends AppCompatActivity {
                         unicast_packet to_sent = arrival;
                         to_sent.seType(1);
                         to_sent.setArrival(System.currentTimeMillis());
+                        to_sent.setFrom(environment);
                         buf = to_sent.toByteArray(to_sent.getType());
                         DatagramPacket tosent = new DatagramPacket(buf, buf.length,
                                 InetAddress.getByName(serverIP), serverPort);
@@ -227,6 +264,7 @@ public class MainActivity extends AppCompatActivity {
                                 byte[] buf = new byte[packetLength];
                                 unicast_packet to_sent = new unicast_packet(seq, 0);
                                 to_sent.setDeparture(System.currentTimeMillis());
+                                to_sent.setFrom(environment);
                                 buf = to_sent.toByteArray(to_sent.getType());
                                 //Log.i(TAG, i + " sent to " + serverIP + " at " + serverPort);
                                 //System.out.println(i + " sent to " + serverIP + " at " + serverPort);
@@ -234,8 +272,8 @@ public class MainActivity extends AppCompatActivity {
                                         InetAddress.getByName(serverIP), serverPort);
                                 clientSocket.send(tosent);
                                 Thread.sleep((int)Math.floor(interval/3));
-                                if (gapCounter >= (i+1)*100) { //实际上为cwdn
-                                    Thread.sleep(5);
+                                if (gapCounter >= (i+1)*30) { //实际上为cwdn
+                                    Thread.sleep(20);
                                     gapCounter=0;
                                 }
                                 gapCounter++;

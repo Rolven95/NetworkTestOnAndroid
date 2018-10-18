@@ -1,6 +1,8 @@
 package com.example.a78487.networktestonandroid;
 
 
+import android.app.AlertDialog;
+
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 
@@ -87,27 +89,29 @@ public class unicast_packet {
 
 
     public byte[] toByteArray(int type) throws UnknownHostException {
-        ByteBuffer buffer;
-        if(type != 1 ) { // non-ack
-            buffer = ByteBuffer.allocate(packetLength);
+            ByteBuffer buffer;
+            if(type != 1 ) { // non-ack
+                buffer = ByteBuffer.allocate(packetLength);
 
-        }else{
-            buffer = ByteBuffer.allocate(50);
-        }
-        buffer.order(ByteOrder.BIG_ENDIAN);
+            }else{
+                buffer = ByteBuffer.allocate(50);
+            }
+            buffer.order(ByteOrder.BIG_ENDIAN);
 
-        buffer.putInt(this.seq);	    	  // 4bytes 0-3
+            buffer.putInt(this.seq);	    	  // 4bytes 0-3
         buffer.putInt(this.type); // 32 33 34 35
 
         buffer.putLong(this.departure); 	  // 8bytes 4-11 +4
         buffer.putLong(this.arrival);    	  // 8bytes 12-19 +4
         buffer.putLong(this.nakArrival); // 8bytes 20-27 +4
-        byte ip_in_bytes[] = InetAddress.getByName(this.from).getAddress(); //+4
+        /*byte ip_in_bytes[] = InetAddress.getByName(this.from).getAddress(); //+4
         buffer.put(ip_in_bytes[0]);
         buffer.put(ip_in_bytes[1]);
         buffer.put(ip_in_bytes[2]);
         buffer.put(ip_in_bytes[3]);
-
+        */
+        //byte list[] = ;
+        buffer.put(this.from.getBytes());
 
         //System.out.println("");
         byte[] bytes = buffer.array();
@@ -176,4 +180,5 @@ public class unicast_packet {
         }
         //return null;
     }
+
 }
