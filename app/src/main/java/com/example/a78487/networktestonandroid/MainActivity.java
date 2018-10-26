@@ -28,11 +28,13 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 
 public class MainActivity extends AppCompatActivity {
+
     private static final String TAG = "MainActivity";
     private Context context;
     //---------------------------------------
     //public static String serverIP = "13.115.245.244"; //"13.233.125.32";
-    public static String serverIP = "35.154.250.202"; //"13.233.125.32";35.154.250.202
+    //public static String serverIP = "35.154.250.202"; //"13.233.125.32";35.154.250.202 印度第一台
+    public static String serverIP = "13.232.64.25"; //印度乌班图
     //public static String serverIP = "192.168.202.20";
     public static String displayMessage = "WIFI";
     public static int serverPort = 9001;
